@@ -1,6 +1,9 @@
 // main.js - Ferð logic & interactive mobile/desktop controllers
 
+window.FERD_API_BASE_URL ||= (window.location.port === '3000' ? 'http://localhost:4000/api' : '/api');
+
 document.addEventListener('DOMContentLoaded', () => {
+
   // 1. Mobile Navigation Drawer Toggle
   const navToggleBtn = document.getElementById('nav-toggle-btn');
   const mobileDrawer = document.getElementById('mobile-nav-drawer');
@@ -115,13 +118,11 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   function applyCurrentFilters() {
-    if (!window.allDestinations) return;
-    const filtered = typeof applyFilters === 'function' 
-        ? applyFilters(window.allDestinations, filterState)
-        : window.allDestinations;
-    if (typeof window.renderFeatured === 'function') {
-      window.renderFeatured(filtered);
-    }
+    if (!window.loadDestinations) return;
+    const budget = { '$': 'Budget', '$$': 'Moderate', '$$$': 'Luxury' }[filterState.budget] || filterState.budget;
+    window.loadDestinations({ budget, season: filterState.season, interest: filterState.interests.join(',') })
+      .then(data => { window.allDestinations = data; window.renderFeatured?.(data); })
+      .catch(() => window.renderFeatured?.([]));
   }
 
   // 4. Search Button & Input Handling with Auto-Scroll to Results & Keyboard Dismissal
@@ -154,14 +155,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const handleSearch = () => {
     if (!searchInput) return;
-    const q = searchInput.value.toLowerCase().trim();
-    if (!window.allDestinations) return;
-    const filtered = window.allDestinations.filter(d =>
-      !q || d.name.toLowerCase().includes(q) || (d.country && d.country.toLowerCase().includes(q))
-    );
-    if (typeof window.renderFeatured === 'function') {
-      window.renderFeatured(filtered);
-    }
+    if (!window.loadDestinations) return;
+    const budget = { '$': 'Budget', '$$': 'Moderate', '$$$': 'Luxury' }[filterState.budget] || filterState.budget;
+    window.loadDestinations({ search: searchInput.value.trim(), budget, season: filterState.season, interest: filterState.interests.join(',') })
+      .then(data => { window.allDestinations = data; window.renderFeatured?.(data); })
+      .catch(() => window.renderFeatured?.([]));
   };
 
   if (searchBtn) {
@@ -283,8 +281,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const durBtn = document.querySelector('.segmented[aria-label="Trip duration"] .active');
       if (durBtn) prefs.duration = durBtn.textContent.trim();
       
-      if (typeof window.getRecommendations === 'function' && window.allDestinations) {
-        const recs = window.getRecommendations(window.allDestinations, prefs);
+      const apiBudget = { '$': 'Budget', '$$': 'Moderate', '$$$': 'Luxury' }[prefs.budget] || prefs.budget;
+      fetch(`${window.FERD_API_BASE_URL || '/api'}/recommendations`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...prefs, budget: apiBudget })
+      }).then(response => {
+        if (!response.ok) throw new Error('Recommendation request failed');
+        return response.json();
+      }).then(recs => {
         const resultCard = document.querySelector('.result-card');
         if (resultCard && recs.length) {
           const basePath = window.location.pathname.includes('/pages/') ? '' : 'pages/';
@@ -329,7 +333,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
           }, 60);
         }
-      }
+      }).catch(error => console.error('Unable to load recommendations', error));
     });
   }
 

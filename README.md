@@ -1,86 +1,91 @@
-# Ferð — Travel Discovery & Exploration Platform
+# Ferð Frontend Client
 
-A modern, responsive web application for discovering personalized travel destinations, exploring regional cultures and cuisines, and planning custom travel itineraries.
+## Project Title
+Ferð — Frontend UI
+
+## Description
+The Ferð frontend is a **static‑site client** built with vanilla HTML, CSS, and JavaScript. It provides a responsive, mobile‑first UI for discovering travel destinations, filtering them, and viewing detailed information. During local development a tiny **Node.js proxy server** (`frontend/server.js`) runs on port 3000 and forwards any request that starts with `/api/` to the backend API at `http://localhost:4000/api`. This removes CORS concerns and lets the UI use relative URLs (`/api/destinations`). In production the static files can be hosted on any CDN (Netlify, Vercel, GitHub Pages, etc.) and the UI will call the backend directly.
+
+## File Structure (high‑level)
+```
+frontend/                     # Project root for the UI
+├─ index.html                # Landing / discovery page (home)
+├─ README.md                 # (this file)
+├─ server.js                 # Tiny Node proxy – serves static files & forwards /api/*
+├─ package.json              # npm scripts (start) – no external deps needed
+├─ css/                      # Design‑system style sheets
+│  ├─ main.css               # Unified typography, variables, layout helpers
+│  ├─ variables.css          # Color tokens, spacing, font sizes
+│  ├─ layout.css             # Grid & flex layout utilities
+│  ├─ components.css         # Reusable component styling (cards, buttons, etc.)
+│  └─ responsive.css        # Mobile‑first media queries
+├─ js/                       # Modular UI logic (ES6 modules)
+│  ├─ main.js                # Navigation drawer, router, UI initialization
+│  ├─ featured.js            # Loads destination data from the API and renders the "featured" cards
+│  ├─ destination-details.js# Loads a single destination (via `?id=`) and builds the detail view
+│  ├─ filters.js             # Search, budget, interest, and season filters – builds query string for the API
+│  ├─ favorites.js           # LocalStorage‑based bookmark persistence (add/remove favorites)
+│  └─ recommendations.js     # Recommendation quiz UI and calls the `/api/recommendations` endpoint
+├─ assets/                    # Images, SVG icons, and static media used by the UI
+│  └─ images/                # Destination SVGs, photos, branding assets
+├─ data/                     # Legacy backup JSON (not used at runtime)
+│  └─ destinations.json      # Original static data source – UI now calls the backend API
+└─ pages/                    # Individual HTML pages (loaded via the router)
+   ├─ explore.html            # Main "Explore" page – grid of destination cards
+   ├─ destination.html        # Destination detail view (populated via JS)
+   ├─ favorites.html         # Saved/bookmarked destinations (reads from LocalStorage)
+   ├─ about.html             # About / methodology page
+   └─ food-culture.html      # Culinary & cultural highlights page
+```
+
+## Site Map (client‑side navigation)
+| Page | URL (relative) | Purpose |
+|------|----------------|----------|
+| **Home / Landing** | `/` (served by `index.html`) | Brief intro and quick link to the Explore page |
+| **Explore** | `/pages/explore.html` | Grid of destination cards, filter bar, search bar – pulls data from `GET /api/destinations` |
+| **Destination Detail** | `/pages/destination.html?id=<id>` | Shows full details for a single destination (overview, images, attractions, local food, etc.) |
+| **Favorites** | `/pages/favorites.html` | Lists destinations the user has bookmarked via `favorites.js` (stored in `localStorage`) |
+| **About** | `/pages/about.html` | Project description, data source, methodology |
+| **Food & Culture** | `/pages/food-culture.html` | Highlights culinary and cultural information for the destinations |
+
+All navigation is handled by `js/main.js` which intercepts clicks on `<a>` elements and swaps the `<main>` content without a full page reload (single‑page‑app feel). The router respects the `?id=` query parameter for the detail view.
+
+## How the Proxy Works (`frontend/server.js`)
+```js
+// When a request path begins with /api/ the server creates an HTTP request
+// to the backend (default localhost:4000). It forwards method, headers, and body
+// and streams the response back to the browser. Static assets (HTML, CSS, JS,
+// images) are served directly from the filesystem.
+```
+The proxy adds the header `Access-Control-Allow-Origin: http://localhost:3000` so the browser can safely call the API during development.
+
+## How to Run (local development)
+```bash
+# 1️⃣ Install (optional – creates a node_modules folder for the proxy script)
+cd "c:/Users/8319j/OneDrive/Documents/jana project/Ferð/fero final/frontend"
+npm ci
+
+# 2️⃣ Make sure the backend API is running (see backend README) on http://localhost:4000
+
+# 3️⃣ Start the frontend proxy
+npm start   # runs `node server.js` → http://localhost:3000
+```
+Open a browser and navigate to:
+```
+http://localhost:3000
+```
+You should see the landing page, be able to click **Explore**, and the UI will fetch live destination data from the backend.
+
+### Environment variables (optional)
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `PORT` | `3000` | Port on which the proxy server listens |
+| `BACKEND_PORT` | `4000` | Port of the backend API that the proxy forwards `/api/*` to |
+You can override them by creating a `.env` file in the `frontend/` folder (the server reads them via `dotenv`).
+
+## Production deployment
+1. **Static host** – upload the entire `frontend/` directory (except `server.js` and `package.json`) to any static‑file CDN (Netlify, Vercel, GitHub Pages, etc.).
+2. **Backend URL** – in production the proxy is unnecessary. Replace the `window.FERD_API_BASE_URL` value in `js/featured.js` (or set it via an environment variable) with the live backend endpoint, e.g., `https://api.myferd.com/api`.
+3. **Optional – keep the proxy** – if you still want a simple Node server in production (e.g., on Render), just set `PORT` and `BACKEND_PORT` accordingly and deploy the server as a small Node service.
 
 ---
-
-## 📖 Description
-
-**Ferð** (meaning *journey* or *travel*) helps travelers discover destinations that truly fit their travel style, budget, and pace before committing to an itinerary. 
-
-### Key Features:
-- **Personalized Travel Match Quiz:** Interactive quiz ("Find my match") that scores and recommends destinations according to user preferences (pace, budget, climate, interests).
-- **Interactive Destination Directory:** Browse and filter destinations dynamically by region, budget, and travel style.
-- **Dynamic Destination Details:** Comprehensive destination pages (`/pages/destination.html?id=...`) with local highlights, food guides, and practical travel tips.
-- **Favorites & Bookmarks:** Save and manage favorite destinations locally via browser `localStorage`.
-- **Food & Culture Guides:** Curated highlights of local street foods, dishes, and cultural etiquette.
-- **Modern Lightweight Stack:** Built with semantic HTML5, modern vanilla CSS design tokens, and modular ES6 JavaScript with no heavy front-end framework overhead.
-- **Integrated Proxy Server:** Built-in lightweight Node.js HTTP server that serves static client assets and proxies `/api/*` requests to the backend server (port 4000) with static fallback data.
-
----
-
-## 🚀 How to Run
-
-### Prerequisites
-Make sure you have **[Node.js](https://nodejs.org/)** (v16+ recommended) installed on your system.
-
-### 1. Open Terminal in Project Directory
-Ensure your terminal / PowerShell is in the project root:
-```bash
-cd "c:\Users\8319j\OneDrive\Desktop\fero frontend"
-```
-
-### 2. Start the Application
-Run one of the following commands:
-
-**Standard Start:**
-```bash
-npm start
-```
-*Or directly via Node:*
-```bash
-node server.js
-```
-
-**Development Mode (with auto-reload on file changes):**
-```bash
-npm run dev
-```
-
-### 3. Open in Browser
-Once started, visit:
-👉 **[http://localhost:3000](http://localhost:3000)**
-
----
-
-## 📂 Project Structure
-
-```
-fero-frontend/
-├── index.html              # Main Discovery / Landing Page & Hero
-├── server.js               # Node.js static & API reverse proxy server (Port 3000)
-├── package.json            # Project configuration & npm scripts
-├── README.md               # Project documentation
-├── pages/
-│   ├── explore.html        # Interactive Explore & Filter Directory
-│   ├── destination.html    # Dynamic Destination Detail Page (?id=...)
-│   ├── favorites.html      # Saved Bookmarks & Shortlist Page
-│   ├── about.html          # About & Methodology Page
-│   └── food-culture.html   # Culinary & Cultural highlights
-├── css/
-│   ├── main.css            # Core styles and design system import
-│   ├── variables.css       # Design tokens (colors, typography, spacing)
-│   ├── layout.css          # Macro layout grids and flex wrappers
-│   └── components.css      # Reusable UI component styling
-├── js/
-│   ├── main.js             # Navigation, drawer, and quiz logic
-│   ├── featured.js         # Destination cards and API rendering
-│   ├── destination-details.js # Single destination view controller
-│   ├── filters.js          # Search, budget, and interest tagging
-│   ├── favorites.js        # LocalStorage bookmark manager
-│   └── recommendations.js  # Recommendation scoring algorithm
-├── assets/
-│   └── images/             # Vector SVGs and destination imagery
-└── data/
-    └── destinations.json   # Static fallback destination dataset
-```

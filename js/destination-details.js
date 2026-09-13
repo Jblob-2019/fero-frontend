@@ -21,35 +21,13 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
-  // Helper to get destinations (use already loaded data if available)
-  const loadDestinations = () => {
-    if (window.allDestinations) {
-      return Promise.resolve(window.allDestinations);
-    }
-    const apiUrl = (window.location.port === '3000') ? 'http://localhost:4000/api/destinations' : '/api/destinations';
-    return fetch(apiUrl)
-      .then(r => {
-        if (!r.ok) throw new Error('API request failed');
-        return r.json();
-      })
-      .catch(() => {
-        return fetch('/api/destinations').then(r => r.json());
-      })
-      .catch(() => {
-        return fetch('../data/destinations.json').then(r => r.json());
-      })
-      .then(data => {
-        window.allDestinations = data;
-        return data;
-      });
-  };
-
-  loadDestinations().then(destinations => {
-    const dest = destinations.find(d => String(d.id) === id);
-    if (!dest) {
-      renderNotFound();
-      return;
-    }
+  const apiBase = window.FERD_API_BASE_URL || (window.location.port === '3000' ? 'http://localhost:4000/api' : '/api');
+  fetch(`${apiBase}/destinations/${encodeURIComponent(id)}`).then(response => {
+    if (response.status === 404) return null;
+    if (!response.ok) throw new Error('API request failed');
+    return response.json();
+  }).then(dest => {
+    if (!dest) return renderNotFound();
     const jpgPath = `../assets/images/${dest.name.toLowerCase()}.jpg`;
     const svgPath = `../assets/images/${dest.name.toLowerCase()}.svg`;
     const mediaHtml = `<img src="${jpgPath}" alt="${dest.name}" onerror="this.onerror=null; this.src='${svgPath}';" style="width:100%;height:100%;object-fit:cover;box-shadow:0 12px 32px rgba(30,58,47,0.12);"/>`;

@@ -3,45 +3,38 @@
 document.addEventListener('DOMContentLoaded', () => {
   const container = document.getElementById('featured-destinations');
 
-  // Fetch data from backend API (port 4000 if frontend is on 3000, or relative /api)
-  const apiUrl = (window.location.port === '3000') ? 'http://localhost:4000/api/destinations' : '/api/destinations';
-  fetch(apiUrl)
-    .then(r => {
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return r.json();
-    })
+  // Set window.FERD_API_BASE_URL before these scripts to use a deployed API.
+  window.FERD_API_BASE_URL ||= window.location.port === '3000' ? 'http://localhost:4000/api' : '/api';
+  window.loadDestinations = (params = {}) => {
+    const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value));
+    return fetch(`${window.FERD_API_BASE_URL}/destinations${query.size ? `?${query}` : ''}`).then(response => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    });
+  };
+  if (container) {
+    container.innerHTML = `
+      <div style="grid-column:1/-1;text-align:center;padding:48px 16px;color:var(--ink-muted);">
+        <p style="font-size:16px;">Loading destinations...</p>
+      </div>`;
+  }
+
+  window.loadDestinations()
     .then(data => {
       window.allDestinations = data; // expose globally for search filtering
       if (container) render(data);
     })
     .catch(err => {
-      console.warn('Direct API load failed, trying local proxy / fallback', err);
-      const basePath = window.location.pathname.includes('/pages/') ? '../' : '';
-      fetch('/api/destinations')
-        .then(r => {
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          return r.json();
-        })
-        .catch(() => fetch(basePath + 'data/destinations.json').then(r => r.json()))
-        .then(r => r.json())
-        .then(data => {
-          window.allDestinations = data;
-          if (container) render(data);
-        })
-        .catch(e => console.error('Unable to load destinations', e));
+      console.error('Unable to load destinations', err);
+      if (container) {
+        container.innerHTML = `
+          <div style="grid-column:1/-1;text-align:center;padding:48px 16px;color:var(--ink-muted);">
+            <p style="font-size:16px;margin-bottom:12px;">Unable to load destinations from the backend.</p>
+            <button type="button" class="btn btn-secondary" onclick="location.reload()" style="cursor:pointer;">Retry</button>
+          </div>`;
+      }
     });
 
-  // Search box – filter the displayed cards as the user types
-  const searchInput = document.getElementById('dest-search');
-  if (searchInput && container) {
-    searchInput.addEventListener('input', e => {
-      const q = e.target.value.toLowerCase();
-      const filtered = (window.allDestinations || []).filter(d =>
-        d.name.toLowerCase().includes(q) || (d.country && d.country.toLowerCase().includes(q))
-      );
-      render(filtered);
-    });
-  }
 
   function render(destinations) {
     if (!container) return;
